@@ -187,7 +187,8 @@ body.locked .paid-btn,
 body.locked .note-add-col-btn,
 body.locked .note-action-td,
 body.locked .note-table-header .btn,
-body.locked #sync-now-btn,
+body.locked #sync-save-btn,
+body.locked #sync-load-btn,
 body.locked .bank-name-input,
 body.locked [onclick="addNoteTable()"],
 body.locked .table-toolbar .btn-primary{display:none !important}
@@ -416,25 +417,6 @@ textarea.note-cell-input{resize:none;overflow:hidden;line-height:1.5;min-height:
 
 }
 
-/* ===== BPI Charges Tab ===== */
-.bpi-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px;padding:0 2px}
-.bpi-cal-day{border-radius:6px;padding:6px 4px;text-align:center;font-size:11px;font-weight:500;background:var(--surface);border:1px solid var(--border);color:var(--text2);min-height:36px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-sizing:border-box}
-.bpi-cal-day.bpi-del{background:#fff3c4;border-color:#e6c84a;color:#7a6000}
-.bpi-cal-day.bpi-groc{background:#ede0f7;border-color:#9b6fc4;color:#5a2d8a}
-.bpi-cal-day.bpi-both{background:linear-gradient(135deg,#fff3c4 50%,#ede0f7 50%);border-color:#b0a0d0}
-.bpi-cal-day.bpi-header{background:none;border:none;color:var(--text3);font-size:10px;font-weight:600;text-transform:uppercase}
-.bpi-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:20px}
-.bpi-table-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--surface2)}
-.bpi-table-title{font-size:14px;font-weight:700;color:var(--text)}
-.bpi-table-footer{padding:10px 14px;border-top:2px solid var(--border);background:var(--surface2);display:flex;justify-content:space-between;align-items:center}
-.bpi-table-inner{overflow-x:auto;-webkit-overflow-scrolling:touch;display:inline-block;min-width:100%;vertical-align:top}
-.bpi-table-inner table{border-collapse:collapse;table-layout:fixed}
-.bpi-table-inner colgroup col.bpi-col-date{width:60px}
-.bpi-table-inner colgroup col.bpi-col-amt{width:100px}
-.bpi-table-inner colgroup col.bpi-col-del{width:32px}
-.bpi-th{position:relative;padding:7px 8px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:10px;color:var(--text3);text-transform:uppercase;text-align:left;user-select:none;white-space:nowrap}
-.bpi-th-resizer{position:absolute;right:0;top:15%;bottom:15%;width:4px;cursor:col-resize;background:var(--border);border-radius:2px;z-index:1;transition:background .15s,width .15s}
-.bpi-th-resizer:hover,.bpi-th-resizer.dragging{background:var(--accent);width:4px;opacity:1}
 </style>
 </head>
 <body>
@@ -451,7 +433,6 @@ textarea.note-cell-input{resize:none;overflow:hidden;line-height:1.5;min-height:
     <button class="tab-btn" onclick="switchTab('allan',this)">&#129489; Allan</button>
     <button class="tab-btn" onclick="switchTab('hazel',this)">&#128105; Hazel</button>
     <button class="tab-btn" onclick="switchTab('notes',this)">&#128221; Notes</button>
-    <button class="tab-btn" onclick="switchTab('bpi',this)">&#127968; BPI Charges</button>
   </div>
 </div>
 
@@ -459,7 +440,8 @@ textarea.note-cell-input{resize:none;overflow:hidden;line-height:1.5;min-height:
   <div class="sync-dot" id="sync-dot"></div>
   <span class="sync-label" id="sync-label">Not connected to Google Sheets</span>
   <button class="sync-url-btn" onclick="openSyncSetup()">&#9881; Setup</button>
-  <button class="sync-url-btn" id="sync-now-btn" onclick="syncNow()" style="display:none">&#8635; Sync Now</button>
+  <button class="sync-url-btn" id="sync-save-btn" onclick="syncNow()" style="display:none">&#8593; Save to Sheet</button>
+  <button class="sync-url-btn" id="sync-load-btn" onclick="loadFromSheets()" style="display:none">&#8595; Sync from Sheet</button>
 </div>
 
 <div class="calendar-bar">
@@ -574,25 +556,6 @@ textarea.note-cell-input{resize:none;overflow:hidden;line-height:1.5;min-height:
   </div>
 
 </div>
-
-  <!-- BPI CHARGES TAB -->
-  <div class="tab-content" id="tab-bpi" style="padding:0 4px">
-    <div style="margin-bottom:16px">
-      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Period</div>
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <div style="display:flex;align-items:center;gap:6px">
-          <label style="font-size:12px;color:var(--text2)">From</label>
-          <input type="date" id="bpi-from" class="form-input" style="width:auto;font-size:12px;padding:5px 8px" onchange="saveBPIPeriod();renderBPITab()">
-        </div>
-        <div style="display:flex;align-items:center;gap:6px">
-          <label style="font-size:12px;color:var(--text2)">To</label>
-          <input type="date" id="bpi-to" class="form-input" style="width:auto;font-size:12px;padding:5px 8px" onchange="saveBPIPeriod();renderBPITab()">
-        </div>
-      </div>
-    </div>
-    <div id="bpi-calendar" style="margin-bottom:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;display:none"></div>
-    <div id="bpi-tables"></div>
-  </div>
 
 <!-- EXPENSE MODAL -->
 <div class="modal-bg hidden" id="expense-modal">
@@ -734,7 +697,7 @@ var COLORS=['#b05a30','#6858a0','#5a8050','#a8606a','#5a7898','#b86830','#4a8878
 // =====================================================================
 function getData(){try{return JSON.parse(localStorage.getItem('budgetData4')||'null')||defData();}catch(e){return defData();}}
 function setData(d){localStorage.setItem('budgetData4',JSON.stringify(d));}
-function defData(){return{expenses:[],banks:[{id:'b1',name:'BDO',color:'#e8b86d'},{id:'b2',name:'BPI',color:'#5bb8f5'},{id:'b3',name:'GCash',color:'#5ac98a'}],finEntries:{allan:[],hazel:[]},bpiTables:{deliveries:{},groceries:{}},nextId:1,nextFinId:1};}
+function defData(){return{expenses:[],banks:[{id:'b1',name:'BDO',color:'#e8b86d'},{id:'b2',name:'BPI',color:'#5bb8f5'},{id:'b3',name:'GCash',color:'#5ac98a'}],finEntries:{allan:[],hazel:[]},nextId:1,nextFinId:1};}
 
 // =====================================================================
 // SYNC — Google Sheets via Apps Script
@@ -742,10 +705,12 @@ function defData(){return{expenses:[],banks:[{id:'b1',name:'BDO',color:'#e8b86d'
 function setSyncStatus(state, msg){
   var dot=document.getElementById('sync-dot');
   var lbl=document.getElementById('sync-label');
-  var btn=document.getElementById('sync-now-btn');
+  var saveBtn=document.getElementById('sync-save-btn');
+  var loadBtn=document.getElementById('sync-load-btn');
   dot.className='sync-dot '+(state==='ok'?'ok':state==='err'?'err':state==='busy'?'busy':'');
   lbl.textContent=msg;
-  btn.style.display=SCRIPT_URL?'':'none';
+  saveBtn.style.display=SCRIPT_URL?'':'none';
+  loadBtn.style.display=SCRIPT_URL?'':'none';
 }
 
 function syncNow(){
@@ -813,11 +778,13 @@ function saveSyncUrl(){
   localStorage.setItem('budgetScriptUrl',url);
   closeSyncSetup();
   if(url){
-    document.getElementById('sync-now-btn').style.display='';
+    document.getElementById('sync-save-btn').style.display='';
+    document.getElementById('sync-load-btn').style.display='';
     loadFromSheets();
   } else {
     setSyncStatus('','Not connected to Google Sheets');
-    document.getElementById('sync-now-btn').style.display='none';
+    document.getElementById('sync-save-btn').style.display='none';
+    document.getElementById('sync-load-btn').style.display='none';
   }
 }
 
@@ -841,7 +808,6 @@ function switchTab(id,btn){
   document.querySelectorAll('.tab-btn').forEach(function(el){el.classList.remove('active');});
   document.getElementById('tab-'+id).classList.add('active');
   btn.classList.add('active');
-  if(id==='bpi') loadBPIPeriod();
 }
 function getExpenses(){
   var d=getData();
@@ -936,7 +902,7 @@ function buildCatBarList(segs,title,bigFont,noPct,colorPicker){
       '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'+
         dotCell+
         '<span style="font-size:'+fs+';color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escH(seg.label)+'</span>'+
-        '<span style="font-size:'+fs+';font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;display:inline-flex;min-width:110px;justify-content:space-between"><span>&#8369;</span><span>'+fmt(seg.value)+'</span></span>'+
+        '<span style="font-size:'+fs+';font-weight:600;color:'+(seg.valueColor||'var(--text)')+';font-variant-numeric:tabular-nums;white-space:nowrap;display:inline-flex;min-width:110px;justify-content:space-between"><span>&#8369;</span><span>'+fmt(seg.value)+'</span></span>'+
         (noPct?'':'<span style="font-size:'+fs+';color:var(--text2);white-space:nowrap;min-width:40px;text-align:right;margin-left:6px">'+pct+'%</span>')+
       '</div>'+
       '<div style="background:var(--surface2);border-radius:4px;overflow:hidden;height:6px">'+
@@ -1216,9 +1182,10 @@ function renderPersonTab(person){
         else bankUnpaidAmt+=amt;
       });
       grandPaid+=bankPaidAmt; grandUnpaid+=bankUnpaidAmt;
+      var amtColor=(bankPaidAmt>0&&bankUnpaidAmt<=0)?'var(--green)':(bankPaidAmt>0&&bankUnpaidAmt>0)?'var(--orange)':'var(--text)';
       return '<tr>'+
         '<td style="padding:7px 10px 7px 0;font-size:13px;font-weight:600;color:var(--text);border-bottom:1px solid var(--border)">'+escH(k)+'</td>'+
-        '<td style="padding:7px 10px;font-size:13px;font-weight:600;color:var(--text);border-bottom:1px solid var(--border);white-space:nowrap"><span style="display:inline-flex;min-width:110px;justify-content:space-between;font-variant-numeric:tabular-nums"><span>&#8369;</span><span>'+fmt(bankMap[k])+'</span></span></td>'+
+        '<td style="padding:7px 10px;font-size:13px;font-weight:600;color:'+amtColor+';border-bottom:1px solid var(--border);white-space:nowrap"><span style="display:inline-flex;min-width:110px;justify-content:space-between;font-variant-numeric:tabular-nums"><span>&#8369;</span><span>'+fmt(bankMap[k])+'</span></span></td>'+
         '<td style="padding:7px 0 7px 10px;text-align:right;border-bottom:1px solid var(--border)"><button class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 10px;width:84px;justify-content:center;'+btnStyle+'" onclick="markBankPaid(\''+escH(ids)+'\',\''+pLower+'\','+allPaid+')">'+btnLabel+'</button></td>'+
       '</tr>';
     }).join('');
@@ -1318,11 +1285,15 @@ function buildBankBarCard(){
   });
   var grandTotal=Object.values(bankTotals).reduce(function(s,v){return s+v;},0);
   var grandPaid=0,grandUnpaid=0;
+  var bankPaidMap={},bankUnpaidMap={};
   Object.keys(bankExpMap).forEach(function(b){
+    var paidAmt=0,unpaidAmt=0;
     bankExpMap[b].forEach(function(e){
       var amt=Number(e.amount||0);
-      if(getPaid(e,'paid')) grandPaid+=amt; else grandUnpaid+=amt;
+      if(getPaid(e,'paid')) paidAmt+=amt; else unpaidAmt+=amt;
     });
+    bankPaidMap[b]=paidAmt; bankUnpaidMap[b]=unpaidAmt;
+    grandPaid+=paidAmt; grandUnpaid+=unpaidAmt;
   });
   var segs=d.banks.map(function(b){return{label:b.name,value:bankTotals[b.name]||0,color:b.color||'#9896a4'};}).filter(function(x){return x.value>0;});
   Object.keys(bankTotals).forEach(function(bn){
@@ -1331,6 +1302,11 @@ function buildBankBarCard(){
     }
   });
   segs.sort(function(a,b){return b.value-a.value;});
+  segs.forEach(function(s){
+    var paidAmt=bankPaidMap[s.label]||0, unpaidAmt=bankUnpaidMap[s.label]||0;
+    if(paidAmt>0&&unpaidAmt<=0) s.valueColor='var(--green)';
+    else if(paidAmt>0&&unpaidAmt>0) s.valueColor='var(--orange)';
+  });
 
   var footer=
     '<div class="bank-footer" style="margin-top:14px;border-top:2px solid var(--border);padding-top:12px">'+
@@ -1840,239 +1816,6 @@ function updateNotesGrid(){
   }
 }
 
-// =====================================================================
-// BPI CHARGES TAB
-// =====================================================================
-function saveBPIPeriod(){
-  var f=document.getElementById('bpi-from').value;
-  var t=document.getElementById('bpi-to').value;
-  localStorage.setItem('bpiPeriod',JSON.stringify({from:f,to:t}));
-}
-function loadBPIPeriod(){
-  var saved=localStorage.getItem('bpiPeriod');
-  if(!saved) return;
-  var v=JSON.parse(saved);
-  var f=document.getElementById('bpi-from');
-  var t=document.getElementById('bpi-to');
-  if(f&&t&&v.from&&v.to){
-    f.value=v.from;
-    t.value=v.to;
-    renderBPITab();
-  }
-}
-function bpiPeriodKey(){
-  var f=document.getElementById('bpi-from');
-  var t=document.getElementById('bpi-to');
-  return (f&&f.value&&t&&t.value)?(f.value+'_'+t.value):null;
-}
-function getBPIRows(table){
-  var d=getData();
-  if(!d.bpiTables) d.bpiTables={};
-  if(!d.bpiTables[table]) d.bpiTables[table]=[];
-  // Migrate old keyed format if needed
-  if(!Array.isArray(d.bpiTables[table])){
-    var allRows=[];
-    Object.values(d.bpiTables[table]).forEach(function(rows){allRows=allRows.concat(rows);});
-    d.bpiTables[table]=allRows;
-    saveAndSync(d);
-  }
-  return d.bpiTables[table].slice();
-}
-function saveBPIRows(table,rows){
-  var d=getData();
-  if(!d.bpiTables) d.bpiTables={};
-  d.bpiTables[table]=rows;
-  saveAndSync(d);
-}
-function addBPIRow(table){
-  var rows=getBPIRows(table);
-  rows.push({id:'br'+Date.now(),date:'',item:'',amount:''});
-  saveBPIRows(table,rows);renderBPITab();
-}
-function deleteBPIRow(table,id){
-  var rows=getBPIRows(table).filter(function(r){return r.id!==id;});
-  saveBPIRows(table,rows);renderBPITab();
-}
-function updateBPIRow(table,id,field,value){
-  var rows=getBPIRows(table);
-  var r=rows.find(function(x){return x.id===id;});
-  if(r) r[field]=value;
-  saveBPIRows(table,rows);
-  if(field==='date') renderBPICalendar();
-}
-function renderBPICalendar(){
-  var fromVal=document.getElementById('bpi-from').value;
-  var toVal=document.getElementById('bpi-to').value;
-  var cal=document.getElementById('bpi-calendar');
-  if(!cal) return;
-  if(!fromVal||!toVal){cal.style.display='none';cal.innerHTML='';return;}
-  cal.style.display='block';
-  var fp=fromVal.split('-'),tp=toVal.split('-');
-  var from=new Date(parseInt(fp[0]),parseInt(fp[1])-1,parseInt(fp[2]));
-  var to=new Date(parseInt(tp[0]),parseInt(tp[1])-1,parseInt(tp[2]));
-  if(from>to){cal.innerHTML='<div style="color:var(--red);font-size:12px">From date must be before To date</div>';return;}
-  var delDates={},grocDates={};
-  getBPIRows('deliveries').forEach(function(r){if(r.date)delDates[r.date]=1;});
-  getBPIRows('groceries').forEach(function(r){if(r.date)grocDates[r.date]=1;});
-  var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  var html='<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Calendar</div>';
-  html+='<div class="bpi-cal-grid">';
-  days.forEach(function(d){html+='<div class="bpi-cal-day bpi-header">'+d+'</div>';});
-  var cur=new Date(from.getFullYear(),from.getMonth(),from.getDate());
-  var toLocal=new Date(to.getFullYear(),to.getMonth(),to.getDate());
-  for(var i=0;i<cur.getDay();i++) html+='<div style="background:none;border:none"></div>';
-  while(cur<=toLocal){
-    var y=cur.getFullYear(),m=String(cur.getMonth()+1).padStart(2,'0'),d=String(cur.getDate()).padStart(2,'0');
-    var iso=y+'-'+m+'-'+d;
-    var isDel=delDates[iso],isGroc=grocDates[iso];
-    var cls='bpi-cal-day'+(isDel&&isGroc?' bpi-both':isDel?' bpi-del':isGroc?' bpi-groc':'');
-    html+='<div class="'+cls+'"><span>'+cur.getDate()+'</span><span style="font-size:9px">'+cur.toLocaleString('default',{month:'short'})+'</span></div>';
-    cur.setDate(cur.getDate()+1);
-  }
-  html+='</div>';
-  cal.innerHTML=html;
-}
-function buildBPITable(table,label,color){
-  var allRows=getBPIRows(table);
-  var fromVal=document.getElementById('bpi-from').value;
-  var toVal=document.getElementById('bpi-to').value;
-  // Show rows within period, plus rows with no date yet
-  var rows=allRows.filter(function(r){
-    if(!r.date) return true;
-    return r.date>=fromVal && r.date<=toVal;
-  });
-  var grandTotal=0;
-  var bodyRows=rows.map(function(r){
-    var amt=parseFloat(String(r.amount||'').replace(/[,]/g,''))||0;
-    grandTotal+=amt;
-    var inputStyle='width:100%;font-size:12px;border:none;background:transparent;color:var(--text);outline:none;font-family:inherit;padding:0;cursor:pointer';
-    var amtStyle='text-align:right;width:100%;font-size:12px;border:none;background:transparent;color:var(--text);outline:none;font-family:inherit;padding:0;font-variant-numeric:tabular-nums;cursor:pointer';
-    var mmdd=r.date?(r.date.slice(5,7)+'/'+r.date.slice(8,10)):'—';
-    return '<tr>'+
-      '<td style="padding:7px 8px;border-bottom:1px solid var(--border);width:60px;text-align:left;white-space:nowrap">'+
-        '<span style="font-size:12px;color:var(--text);cursor:pointer;display:inline-block" onclick="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-block\';this.nextElementSibling.focus()">'+mmdd+'</span>'+
-        '<input type="date" value="'+escH(r.date||'')+'" min="'+fromVal+'" max="'+toVal+'" '+
-        'style="display:none;width:100%;font-size:11px;border:none;background:transparent;color:var(--text);outline:none;font-family:inherit;padding:0" '+
-        'onchange="updateBPIRow(\''+table+'\',\''+escH(r.id)+'\',\'date\',this.value);var s=this.value?(this.value.slice(5,7)+\'/\'+this.value.slice(8,10)):\'—\';this.previousElementSibling.textContent=s;this.style.display=\'none\';this.previousElementSibling.style.display=\'inline-block\'" '+
-        'onblur="this.style.display=\'none\';this.previousElementSibling.style.display=\'inline-block\'">'+
-      '</td>'+
-      '<td style="padding:7px 8px;border-bottom:1px solid var(--border)">'+
-        '<input type="text" value="'+escH(r.item||'')+'" placeholder="..." '+
-        'style="'+inputStyle+'" '+
-        'onchange="updateBPIRow(\''+table+'\',\''+escH(r.id)+'\',\'item\',this.value)">'+
-      '</td>'+
-      '<td style="padding:7px 8px;border-bottom:1px solid var(--border);width:120px">'+
-        '<div style="display:flex;justify-content:space-between;align-items:center;gap:4px">'+
-          '<span style="font-size:12px;color:var(--text2)">&#8369;</span>'+
-          '<input type="text" value="'+escH(r.amount||'')+'" placeholder="0.00" '+
-          'style="'+amtStyle+'" '+
-          'onchange="updateBPIRow(\''+table+'\',\''+escH(r.id)+'\',\'amount\',this.value)">'+
-        '</div>'+
-      '</td>'+
-      '<td style="padding:7px 8px;border-bottom:1px solid var(--border);width:32px;text-align:center">'+
-        '<button class="btn btn-danger" style="padding:2px 6px;font-size:11px;background:transparent;border:none;color:var(--red);font-weight:700;cursor:pointer" onclick="deleteBPIRow(\''+table+'\',\''+escH(r.id)+'\')">&#215;</button>'+
-      '</td>'+
-    '</tr>';
-  }).join('');
-  return '<div class="bpi-table-wrap">'+
-    '<div class="bpi-table-header">'+
-      '<span class="bpi-table-title" style="display:flex;align-items:center;gap:8px">'+
-        '<span style="width:12px;height:12px;border-radius:50%;background:'+color+';display:inline-block"></span>'+label+'</span>'+
-    '</div>'+
-    '<div class="bpi-table-inner"><table>'+
-      '<colgroup><col class="bpi-col-date"><col class="bpi-col-item"><col class="bpi-col-amt"><col class="bpi-col-del"></colgroup>'+
-      '<thead><tr>'+
-        '<th class="bpi-th" id="bpi-th-date-'+table+'">Date<div class="bpi-th-resizer" onmousedown="bpiResizeStart(event,\'bpi-col-date\',\''+table+'\')" ontouchstart="bpiResizeStart(event,\'bpi-col-date\',\''+table+'\')"></div></th>'+
-        '<th class="bpi-th" id="bpi-th-item-'+table+'">Item<div class="bpi-th-resizer" onmousedown="bpiResizeStart(event,\'bpi-col-item\',\''+table+'\')" ontouchstart="bpiResizeStart(event,\'bpi-col-item\',\''+table+'\')"></div></th>'+
-        '<th class="bpi-th" style="text-align:center" id="bpi-th-amt-'+table+'">Amount<div class="bpi-th-resizer" onmousedown="bpiResizeStart(event,\'bpi-col-amt\',\''+table+'\')" ontouchstart="bpiResizeStart(event,\'bpi-col-amt\',\''+table+'\')"></div></th>'+
-        '<th class="bpi-th" style="width:32px"></th>'+
-      '</tr></thead>'+
-      '<tbody>'+bodyRows+'</tbody>'+
-      '<tfoot><tr><td colspan="4" style="padding:6px 8px;border-top:1px solid var(--border)">'+
-        '<button class="btn btn-ghost btn-sm" onclick="addBPIRow(\''+table+'\')">+ Add Row</button>'+
-      '</td></tr></tfoot>'+
-    '</table></div>'+
-    '<div class="bpi-table-footer">'+
-      '<span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Grand Total</span>'+
-      '<span style="font-size:15px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums">&#8369;'+fmt(grandTotal)+'</span>'+
-    '</div></div>';
-}
-// BPI column resize
-var bpiResizing=null;
-function bpiResizeStart(e,colClass,table){
-  e.preventDefault();
-  var startX=e.touches?e.touches[0].clientX:e.clientX;
-  var col=document.querySelector('.bpi-table-wrap #bpi-th-'+colClass.replace('bpi-col-','')+'-'+table)
-       ||document.querySelector('.'+colClass);
-  var tableEl=col?col.closest('table'):null;
-  var cols=tableEl?tableEl.querySelectorAll('colgroup col'):[];
-  var targetCol=null;
-  cols.forEach(function(c){if(c.classList.contains(colClass)) targetCol=c;});
-  if(!targetCol) return;
-  var startW=targetCol.offsetWidth||parseInt(targetCol.style.width)||100;
-  var resizer=e.target;
-  resizer.classList.add('dragging');
-  function onMove(ev){
-    var x=ev.touches?ev.touches[0].clientX:ev.clientX;
-    var newW=Math.max(40,startW+(x-startX));
-    targetCol.style.width=newW+'px';
-    // Let table shrink naturally
-    if(tableEl){
-      var total=0;
-      cols.forEach(function(c){total+=parseInt(c.style.width||c.offsetWidth||60);});
-      tableEl.style.width=total+'px';
-      tableEl.style.minWidth='unset';
-    }
-  }
-  function onEnd(){
-    resizer.classList.remove('dragging');
-    // Save widths
-    var saved=JSON.parse(localStorage.getItem('bpiColWidths')||'{}');
-    if(!saved[table]) saved[table]={};
-    saved[table][colClass]=targetCol.style.width;
-    if(tableEl) saved[table]['tableWidth']=tableEl.style.width;
-    localStorage.setItem('bpiColWidths',JSON.stringify(saved));
-    document.removeEventListener('mousemove',onMove);
-    document.removeEventListener('mouseup',onEnd);
-    document.removeEventListener('touchmove',onMove);
-    document.removeEventListener('touchend',onEnd);
-  }
-  document.addEventListener('mousemove',onMove);
-  document.addEventListener('mouseup',onEnd);
-  document.addEventListener('touchmove',onMove,{passive:false});
-  document.addEventListener('touchend',onEnd);
-}
-function bpiApplyColWidths(table){
-  var saved=JSON.parse(localStorage.getItem('bpiColWidths')||'{}');
-  if(!saved[table]) return;
-  var wraps=document.querySelectorAll('.bpi-table-wrap');
-  wraps.forEach(function(wrap){
-    if(!wrap.innerHTML.includes('bpi-th-date-'+table)) return;
-    var tableEl=wrap.querySelector('table');
-    if(!tableEl) return;
-    var cols=tableEl.querySelectorAll('colgroup col');
-    cols.forEach(function(c){
-      ['bpi-col-date','bpi-col-item','bpi-col-amt'].forEach(function(cls){
-        if(c.classList.contains(cls)&&saved[table][cls]) c.style.width=saved[table][cls];
-      });
-    });
-    if(saved[table]['tableWidth']) tableEl.style.width=saved[table]['tableWidth'];
-  });
-}
-
-function renderBPITab(){
-  var fromVal=document.getElementById('bpi-from').value;
-  var toVal=document.getElementById('bpi-to').value;
-  renderBPICalendar();
-  var tables=document.getElementById('bpi-tables');
-  if(!tables) return;
-  if(!fromVal||!toVal){tables.innerHTML='<div style="color:var(--text3);font-size:12px;padding:20px 0">Select a date range to get started.</div>';return;}
-  var gridCols=window.innerWidth<=640?'1fr':'1fr 1fr';
-  tables.innerHTML='<div style="display:grid;grid-template-columns:'+gridCols+';gap:16px;align-items:start">'+buildBPITable('deliveries','Deliveries','#e6c84a')+buildBPITable('groceries','Groceries','#9b6fc4')+'</div>';
-  bpiApplyColWidths('deliveries');
-  bpiApplyColWidths('groceries');
-}
-
 function renderAll(){renderTotalExpense();renderPersonTab('Allan');renderPersonTab('Hazel');renderNotes();}
 
 // =====================================================================
@@ -2432,12 +2175,12 @@ function handleLockBtn(){
 updateCalLabel();
 renderAll();
 updateNotesGrid();
-loadBPIPeriod();
 // Default to unlocked on very first load
 if(localStorage.getItem('budgetLocked')===null) localStorage.setItem('budgetLocked','0');
 applyLockState();
 if(SCRIPT_URL){
-  document.getElementById('sync-now-btn').style.display='';
+  document.getElementById('sync-save-btn').style.display='';
+  document.getElementById('sync-load-btn').style.display='';
   loadFromSheets();
 } else {
   setSyncStatus('','Not connected to Google Sheets — click Configure to set up');
