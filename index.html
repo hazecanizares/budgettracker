@@ -187,8 +187,7 @@ body.locked .paid-btn,
 body.locked .note-add-col-btn,
 body.locked .note-action-td,
 body.locked .note-table-header .btn,
-body.locked #sync-save-btn,
-body.locked #sync-load-btn,
+body.locked #sync-now-btn,
 body.locked .bank-name-input,
 body.locked [onclick="addNoteTable()"],
 body.locked .table-toolbar .btn-primary{display:none !important}
@@ -213,7 +212,6 @@ textarea.note-cell-input{resize:none;overflow:hidden;line-height:1.5;min-height:
   .app-title{font-size:18px;margin-bottom:10px}
   .calendar-bar{padding:8px 12px;gap:8px}
   .cal-month{font-size:14px;min-width:120px}
-  .sync-bar{padding:6px 12px;font-size:11px;gap:6px}
 
   /* Tabs — scrollable horizontal row */
   .tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;gap:2px;padding-bottom:0;scrollbar-width:none}
@@ -306,9 +304,6 @@ textarea.note-cell-input{resize:none;overflow:hidden;line-height:1.5;min-height:
   /* Bar list OUTSIDE infographic (expenses table) — 2-line layout */
   .cat-bar-desktop{display:none !important}
   .cat-bar-mobile{display:block !important}
-
-  /* Sync bar */
-  .sync-url-btn{font-size:10px;padding:2px 7px}
 }
   div[style*="grid-template-columns:1fr 1fr 1fr"]{
     grid-template-columns:1fr 1fr !important;
@@ -333,8 +328,6 @@ textarea.note-cell-input{resize:none;overflow:hidden;line-height:1.5;min-height:
   .note-footer-td{padding:7px 6px !important;font-size:11px !important}
   .note-action-td{padding:0 2px !important;text-align:center !important}
   .note-action-td .btn{padding:0 2px !important;font-size:12px !important;min-width:unset !important;background:transparent !important;color:var(--red) !important;border:none !important;font-weight:700 !important}
-  /* Sync bar */
-  .sync-url-btn{font-size:10px;padding:2px 7px}
 }
 
 /* ===== Mobile-friendly bar list (no horizontal scroll) ===== */
@@ -440,8 +433,7 @@ textarea.note-cell-input{resize:none;overflow:hidden;line-height:1.5;min-height:
   <div class="sync-dot" id="sync-dot"></div>
   <span class="sync-label" id="sync-label">Not connected to Google Sheets</span>
   <button class="sync-url-btn" onclick="openSyncSetup()">&#9881; Setup</button>
-  <button class="sync-url-btn" id="sync-save-btn" onclick="syncNow()" style="display:none">&#8593; Save to Sheet</button>
-  <button class="sync-url-btn" id="sync-load-btn" onclick="loadFromSheets()" style="display:none">&#8595; Sync from Sheet</button>
+  <button class="sync-url-btn" id="sync-now-btn" onclick="syncNow()" style="display:none">&#8635; Sync Now</button>
 </div>
 
 <div class="calendar-bar">
@@ -557,6 +549,22 @@ textarea.note-cell-input{resize:none;overflow:hidden;line-height:1.5;min-height:
 
 </div>
 
+<!-- SYNC SETUP MODAL -->
+<div class="modal-bg hidden" id="sync-modal">
+  <div class="modal">
+    <div class="modal-title">&#9881; Google Sheets Sync</div>
+    <div class="form-row">
+      <label class="form-label">Apps Script Web App URL</label>
+      <input class="form-input" id="sync-url-input" placeholder="https://script.google.com/macros/s/...">
+      <div class="setup-hint">Paste the URL you got after deploying the Apps Script. Leave blank to disconnect.</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeSyncSetup()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSyncUrl()">Save &amp; Test</button>
+    </div>
+  </div>
+</div>
+
 <!-- EXPENSE MODAL -->
 <div class="modal-bg hidden" id="expense-modal">
   <div class="modal">
@@ -660,22 +668,6 @@ textarea.note-cell-input{resize:none;overflow:hidden;line-height:1.5;min-height:
   </div>
 </div>
 
-<!-- SYNC SETUP MODAL -->
-<div class="modal-bg hidden" id="sync-modal">
-  <div class="modal">
-    <div class="modal-title">&#9881; Google Sheets Sync</div>
-    <div class="form-row">
-      <label class="form-label">Apps Script Web App URL</label>
-      <input class="form-input" id="sync-url-input" placeholder="https://script.google.com/macros/s/...">
-      <div class="setup-hint">Paste the URL you got after deploying the Apps Script. Leave blank to disconnect.</div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeSyncSetup()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveSyncUrl()">Save &amp; Test</button>
-    </div>
-  </div>
-</div>
-
 <script>
 // =====================================================================
 // CONFIG — paste your Apps Script URL here OR enter it in the UI
@@ -705,12 +697,10 @@ function defData(){return{expenses:[],banks:[{id:'b1',name:'BDO',color:'#e8b86d'
 function setSyncStatus(state, msg){
   var dot=document.getElementById('sync-dot');
   var lbl=document.getElementById('sync-label');
-  var saveBtn=document.getElementById('sync-save-btn');
-  var loadBtn=document.getElementById('sync-load-btn');
+  var btn=document.getElementById('sync-now-btn');
   dot.className='sync-dot '+(state==='ok'?'ok':state==='err'?'err':state==='busy'?'busy':'');
   lbl.textContent=msg;
-  saveBtn.style.display=SCRIPT_URL?'':'none';
-  loadBtn.style.display=SCRIPT_URL?'':'none';
+  btn.style.display=SCRIPT_URL?'':'none';
 }
 
 function syncNow(){
@@ -727,6 +717,7 @@ function syncNow(){
   .then(function(r){return r.json();})
   .then(function(res){
     if(res.status==='ok'){
+      if(res.data) setData(res.data); // adopt server-merged result so this device stays in sync
       setSyncStatus('ok','Synced — '+new Date().toLocaleTimeString());
     } else {
       setSyncStatus('err','Sync error: '+(res.message||'unknown'));
@@ -746,9 +737,7 @@ function loadFromSheets(){
   .then(function(r){return r.json();})
   .then(function(res){
     if(res.status==='ok' && res.data){
-      var remote=res.data;
-      // Merge: remote wins (it's the source of truth)
-      setData(remote);
+      setData(res.data);
       renderAll();
       setSyncStatus('ok','Loaded — '+new Date().toLocaleTimeString());
     } else {
@@ -778,13 +767,11 @@ function saveSyncUrl(){
   localStorage.setItem('budgetScriptUrl',url);
   closeSyncSetup();
   if(url){
-    document.getElementById('sync-save-btn').style.display='';
-    document.getElementById('sync-load-btn').style.display='';
+    document.getElementById('sync-now-btn').style.display='';
     loadFromSheets();
   } else {
     setSyncStatus('','Not connected to Google Sheets');
-    document.getElementById('sync-save-btn').style.display='none';
-    document.getElementById('sync-load-btn').style.display='none';
+    document.getElementById('sync-now-btn').style.display='none';
   }
 }
 
@@ -902,7 +889,7 @@ function buildCatBarList(segs,title,bigFont,noPct,colorPicker){
       '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'+
         dotCell+
         '<span style="font-size:'+fs+';color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escH(seg.label)+'</span>'+
-        '<span style="font-size:'+fs+';font-weight:600;color:'+(seg.valueColor||'var(--text)')+';font-variant-numeric:tabular-nums;white-space:nowrap;display:inline-flex;min-width:110px;justify-content:space-between"><span>&#8369;</span><span>'+fmt(seg.value)+'</span></span>'+
+        '<span style="font-size:'+fs+';font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;display:inline-flex;min-width:110px;justify-content:space-between"><span>&#8369;</span><span>'+fmt(seg.value)+'</span></span>'+
         (noPct?'':'<span style="font-size:'+fs+';color:var(--text2);white-space:nowrap;min-width:40px;text-align:right;margin-left:6px">'+pct+'%</span>')+
       '</div>'+
       '<div style="background:var(--surface2);border-radius:4px;overflow:hidden;height:6px">'+
@@ -1182,10 +1169,9 @@ function renderPersonTab(person){
         else bankUnpaidAmt+=amt;
       });
       grandPaid+=bankPaidAmt; grandUnpaid+=bankUnpaidAmt;
-      var amtColor=(bankPaidAmt>0&&bankUnpaidAmt<=0)?'var(--green)':(bankPaidAmt>0&&bankUnpaidAmt>0)?'var(--orange)':'var(--text)';
       return '<tr>'+
         '<td style="padding:7px 10px 7px 0;font-size:13px;font-weight:600;color:var(--text);border-bottom:1px solid var(--border)">'+escH(k)+'</td>'+
-        '<td style="padding:7px 10px;font-size:13px;font-weight:600;color:'+amtColor+';border-bottom:1px solid var(--border);white-space:nowrap"><span style="display:inline-flex;min-width:110px;justify-content:space-between;font-variant-numeric:tabular-nums"><span>&#8369;</span><span>'+fmt(bankMap[k])+'</span></span></td>'+
+        '<td style="padding:7px 10px;font-size:13px;font-weight:600;color:var(--text);border-bottom:1px solid var(--border);white-space:nowrap"><span style="display:inline-flex;min-width:110px;justify-content:space-between;font-variant-numeric:tabular-nums"><span>&#8369;</span><span>'+fmt(bankMap[k])+'</span></span></td>'+
         '<td style="padding:7px 0 7px 10px;text-align:right;border-bottom:1px solid var(--border)"><button class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 10px;width:84px;justify-content:center;'+btnStyle+'" onclick="markBankPaid(\''+escH(ids)+'\',\''+pLower+'\','+allPaid+')">'+btnLabel+'</button></td>'+
       '</tr>';
     }).join('');
@@ -1285,15 +1271,11 @@ function buildBankBarCard(){
   });
   var grandTotal=Object.values(bankTotals).reduce(function(s,v){return s+v;},0);
   var grandPaid=0,grandUnpaid=0;
-  var bankPaidMap={},bankUnpaidMap={};
   Object.keys(bankExpMap).forEach(function(b){
-    var paidAmt=0,unpaidAmt=0;
     bankExpMap[b].forEach(function(e){
       var amt=Number(e.amount||0);
-      if(getPaid(e,'paid')) paidAmt+=amt; else unpaidAmt+=amt;
+      if(getPaid(e,'paid')) grandPaid+=amt; else grandUnpaid+=amt;
     });
-    bankPaidMap[b]=paidAmt; bankUnpaidMap[b]=unpaidAmt;
-    grandPaid+=paidAmt; grandUnpaid+=unpaidAmt;
   });
   var segs=d.banks.map(function(b){return{label:b.name,value:bankTotals[b.name]||0,color:b.color||'#9896a4'};}).filter(function(x){return x.value>0;});
   Object.keys(bankTotals).forEach(function(bn){
@@ -1302,11 +1284,6 @@ function buildBankBarCard(){
     }
   });
   segs.sort(function(a,b){return b.value-a.value;});
-  segs.forEach(function(s){
-    var paidAmt=bankPaidMap[s.label]||0, unpaidAmt=bankUnpaidMap[s.label]||0;
-    if(paidAmt>0&&unpaidAmt<=0) s.valueColor='var(--green)';
-    else if(paidAmt>0&&unpaidAmt>0) s.valueColor='var(--orange)';
-  });
 
   var footer=
     '<div class="bank-footer" style="margin-top:14px;border-top:2px solid var(--border);padding-top:12px">'+
@@ -2179,8 +2156,7 @@ updateNotesGrid();
 if(localStorage.getItem('budgetLocked')===null) localStorage.setItem('budgetLocked','0');
 applyLockState();
 if(SCRIPT_URL){
-  document.getElementById('sync-save-btn').style.display='';
-  document.getElementById('sync-load-btn').style.display='';
+  document.getElementById('sync-now-btn').style.display='';
   loadFromSheets();
 } else {
   setSyncStatus('','Not connected to Google Sheets — click Configure to set up');
