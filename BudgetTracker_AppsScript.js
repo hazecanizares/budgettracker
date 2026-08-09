@@ -1,13 +1,21 @@
 // ============================================================
-// BUDGET TRACKER — Google Apps Script (verified sync logic —
-// locking + merge-by-ID + deletion tombstones, tested against
-// add/edit/delete/stale-device/concurrent-save scenarios)
+// BUDGET TRACKER — Google Apps Script
+// Storage design: ONE ROW PER RECORD (not one JSON blob in one
+// cell). Google Sheets has a hard 50,000-character-per-cell limit —
+// with 100+ expenses, the old single-blob design silently exceeded
+// it and Sheets rejected the write without throwing an error. This
+// version stores each expense/bank/entry as its own small row, so
+// no single cell ever comes close to that limit no matter how much
+// data accumulates over time.
+//
 // Paste this entire file into script.google.com, then
 // Deploy > Manage deployments > Edit > New version > Deploy
 // ============================================================
 
-var SHEET_ID = '1Q47S8vigKMZobBj1ZqiBdklBsoY0PXNIEbqJD8P8QxY'; // from the sheet's URL, between /d/ and /edit
+var SHEET_ID = '1Q47S8vigKMZobBj1ZqiBdklBsoY0PXNIEbqJD8P8QxY';
 var SHEET_NAME = 'BudgetData'; // Do not change
+
+var HEADERS = ['ID', 'Type', 'Data'];
 
 
 // ============================================================
@@ -34,7 +42,7 @@ function doGet(e) {
 function doPost(e) {
   var lock = LockService.getScriptLock();
   try {
-    lock.waitLock(15000); // wait up to 15s for any other save to finish
+    lock.waitLock(15000);
   } catch (err) {
     return jsonResponse({ status: 'error', message: 'Server busy — please try again in a moment.' });
   }
@@ -54,33 +62,13 @@ function doPost(e) {
 
 
 // ============================================================
-// LOAD — read the JSON blob from the sheet and return it as-is.
+// LOAD — read every row and reconstruct the data object the app expects
 // ============================================================
 function handleLoad() {
   try {
     var sheet = getOrCreateSheet();
-    var raw = sheet.getRange(1, 1).getValue();
-
-    if (!raw || raw === '') {
-      return jsonResponse({ status: 'ok', data: defaultData() });
-    }
-
-    var parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch (parseErr) {
-      // A1 has non-JSON content in it (e.g. something got pasted in by
-      // mistake). Don't crash the load or silently discard it — report
-      // it clearly so it can be fixed by hand in the sheet.
-      return jsonResponse({
-        status: 'error',
-        message: 'Cell A1 does not contain valid data (found: "' +
-          String(raw).substring(0, 40) + '..."). Check A1 in the BudgetData sheet directly.'
-      });
-    }
-
-    return jsonResponse({ status: 'ok', data: parsed });
-
+    var data = readAllRows(sheet);
+    return jsonResponse({ status: 'ok', data: data });
   } catch (err) {
     return jsonResponse({ status: 'error', message: 'Load failed: ' + err.toString() });
   }
@@ -89,27 +77,13 @@ function handleLoad() {
 
 // ============================================================
 // SAVE — merge incoming data into what's already on the sheet
-// (instead of blindly overwriting it) and write the result.
-// This is what protects you if two devices save close together.
+// (by ID, respecting deletions), then rewrite every row fresh.
 // ============================================================
 function handleSave(incoming) {
   try {
     var sheet = getOrCreateSheet();
-    var raw = sheet.getRange(1, 1).getValue();
-    var current;
-    if (!raw || raw === '') {
-      current = defaultData();
-    } else {
-      try {
-        current = JSON.parse(raw);
-      } catch (e) {
-        current = defaultData(); // corrupted cell — don't block saving forever
-      }
-    }
+    var current = readAllRows(sheet);
 
-    // Union of every id ever marked deleted, from both sides — once
-    // deleted, always excluded, so a stale device that hasn't heard
-    // about the deletion yet can't bring it back.
     var deletedSet = {};
     (current.deletedIds || []).forEach(function (id) { deletedSet[id] = true; });
     (incoming.deletedIds || []).forEach(function (id) { deletedSet[id] = true; });
@@ -121,38 +95,23 @@ function handleSave(incoming) {
         allan: mergeById((current.finEntries || {}).allan, (incoming.finEntries || {}).allan, deletedSet),
         hazel: mergeById((current.finEntries || {}).hazel, (incoming.finEntries || {}).hazel, deletedSet)
       },
-      nextId: Math.max(current.nextId || 1, incoming.nextId || 1),
-      nextFinId: Math.max(current.nextFinId || 1, incoming.nextFinId || 1),
-      deletedIds: Object.keys(deletedSet)
+      deletedIds: Object.keys(deletedSet),
+      noteTables: incoming.noteTables || current.noteTables || {}
     };
 
-    // Carry over any other fields (noteTables, etc.) that aren't
-    // array-based — these take whichever save was last.
-    for (var k in incoming) {
-      if (!(k in merged)) merged[k] = incoming[k];
-    }
-    for (var k2 in current) {
-      if (!(k2 in merged)) merged[k2] = current[k2];
-    }
+    writeAllRows(sheet, merged);
 
-    sheet.getRange(1, 1).setValue(JSON.stringify(merged));
-    sheet.getRange(1, 2).setValue('Last saved: ' + new Date().toLocaleString());
-    writeReadableExpenses(sheet, merged);
-
-    // Force the write to commit, then read it back within this same
-    // execution to PROVE it actually landed — independent of whatever
-    // any browser tab is showing.
-    SpreadsheetApp.flush();
-    var confirmRaw = sheet.getRange(1, 1).getValue();
-    var confirmLength = confirmRaw ? String(confirmRaw).length : 0;
+    // Recompute nextId/nextFinId the same way readAllRows does, for
+    // the response the app uses locally between saves.
+    var withCounters = readAllRows(sheet);
 
     return jsonResponse({
       status: 'ok',
       message: 'Saved successfully',
-      data: merged,
-      debugConfirmedLength: confirmLength,
-      debugSheetUrl: SpreadsheetApp.openById(SHEET_ID).getUrl(),
-      debugTabName: sheet.getName()
+      data: withCounters,
+      debugRowsWritten: (merged.expenses.length + merged.banks.length +
+        merged.finEntries.allan.length + merged.finEntries.hazel.length + merged.deletedIds.length + 1),
+      debugExpenseCount: merged.expenses.length
     });
   } catch (err) {
     return jsonResponse({ status: 'error', message: 'Save failed: ' + err.toString() });
@@ -163,8 +122,7 @@ function handleSave(incoming) {
 // ids (edits apply); ids only present in "current" are kept (so a
 // stale save from another device can't erase items it didn't know
 // about); ids only in "incoming" are added. Anything in deletedSet
-// is excluded from either side — this is how an intentional delete
-// survives being merged against a device that doesn't know about it yet.
+// is excluded from either side.
 function mergeById(currentArr, incomingArr, deletedSet) {
   currentArr = currentArr || [];
   incomingArr = incomingArr || [];
@@ -177,43 +135,86 @@ function mergeById(currentArr, incomingArr, deletedSet) {
 
 
 // ============================================================
-// READABLE ROWS — writes expenses as a human-readable table
-// starting at row 3, for reference only (not read back into the app)
+// ROW STORAGE — one record per row: [ID, Type, Data(json)]
+// Type is one of: expense, bank, fin_allan, fin_hazel, deleted, meta
 // ============================================================
-function writeReadableExpenses(sheet, data) {
-  try {
-    var lastRow = sheet.getLastRow();
-    if (lastRow >= 3) {
-      sheet.getRange(3, 1, lastRow - 2, 10).clearContent();
-    }
+function readAllRows(sheet) {
+  var data = { expenses: [], banks: [], finEntries: { allan: [], hazel: [] }, deletedIds: [], noteTables: {}, nextId: 1, nextFinId: 1 };
 
-    var headers = ['Month', 'Year', 'Category', 'Description', 'Bank', 'Amount', 'Paid By', 'Paid?', 'Installment', 'Months Left'];
-    sheet.getRange(3, 1, 1, headers.length).setValues([headers]);
-
-    var expenses = data.expenses || [];
-    if (expenses.length === 0) return;
-
-    var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    var rows = expenses.map(function(e) {
-      return [
-        MONTHS[e.month] || e.month,
-        e.year,
-        e.category || '',
-        e.desc || '',
-        e.bank || '',
-        e.amount || 0,
-        e.paidBy || '',
-        e.paid ? 'Yes' : 'No',
-        e.installment === 'yes' ? 'Yes' : 'No',
-        e.installment === 'yes' ? (e.installmentMonths || 0) : ''
-      ];
-    });
-
-    sheet.getRange(4, 1, rows.length, headers.length).setValues(rows);
-
-  } catch (err) {
-    Logger.log('writeReadableExpenses error: ' + err.toString());
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    // Empty sheet — seed with default banks so the app has something to work with
+    data.banks = [
+      { id: 'b1', name: 'BDO' },
+      { id: 'b2', name: 'BPI' },
+      { id: 'b3', name: 'GCash' }
+    ];
+    return data;
   }
+
+  var values = sheet.getRange(2, 1, lastRow - 1, 3).getValues();
+  var maxExpId = 0, maxFinId = 0;
+
+  values.forEach(function (row) {
+    var id = row[0], type = row[1], json = row[2];
+    if (!type) return; // skip blank rows
+
+    try {
+      if (type === 'expense') {
+        var e = JSON.parse(json);
+        data.expenses.push(e);
+        var n = parseInt(String(e.id).replace('e', ''), 10);
+        if (!isNaN(n) && n > maxExpId) maxExpId = n;
+      } else if (type === 'bank') {
+        data.banks.push(JSON.parse(json));
+      } else if (type === 'fin_allan') {
+        var fa = JSON.parse(json);
+        data.finEntries.allan.push(fa);
+        var na = parseInt(String(fa.id).replace('f', ''), 10);
+        if (!isNaN(na) && na > maxFinId) maxFinId = na;
+      } else if (type === 'fin_hazel') {
+        var fh = JSON.parse(json);
+        data.finEntries.hazel.push(fh);
+        var nh = parseInt(String(fh.id).replace('f', ''), 10);
+        if (!isNaN(nh) && nh > maxFinId) maxFinId = nh;
+      } else if (type === 'deleted') {
+        data.deletedIds.push(String(id));
+      } else if (type === 'meta') {
+        var m = JSON.parse(json);
+        data.noteTables = m.noteTables || {};
+      }
+    } catch (parseErr) {
+      // one bad row shouldn't take down the whole load — skip it
+      Logger.log('Skipped unreadable row: ' + JSON.stringify(row) + ' — ' + parseErr);
+    }
+  });
+
+  data.finEntries.allan.sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
+  data.finEntries.hazel.sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
+  data.nextId = maxExpId + 1;
+  data.nextFinId = maxFinId + 1;
+
+  return data;
+}
+
+function writeAllRows(sheet, merged) {
+  var rows = [];
+  merged.expenses.forEach(function (e) { rows.push([e.id, 'expense', JSON.stringify(e)]); });
+  merged.banks.forEach(function (b) { rows.push([b.id, 'bank', JSON.stringify(b)]); });
+  (merged.finEntries.allan || []).forEach(function (f) { rows.push([f.id, 'fin_allan', JSON.stringify(f)]); });
+  (merged.finEntries.hazel || []).forEach(function (f) { rows.push([f.id, 'fin_hazel', JSON.stringify(f)]); });
+  merged.deletedIds.forEach(function (id) { rows.push([id, 'deleted', '']); });
+  rows.push(['app', 'meta', JSON.stringify({ noteTables: merged.noteTables || {} })]);
+
+  // Clear everything below the header, then write the full fresh set.
+  var lastRow = sheet.getLastRow();
+  if (lastRow >= 2) {
+    sheet.getRange(2, 1, lastRow - 1, 3).clearContent();
+  }
+  if (rows.length > 0) {
+    sheet.getRange(2, 1, rows.length, 3).setValues(rows);
+  }
+  sheet.getRange(1, 5).setValue('Last saved: ' + new Date().toLocaleString());
 }
 
 
@@ -226,22 +227,12 @@ function getOrCreateSheet() {
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);
   }
+  // Make sure the header row exists
+  var firstCell = sheet.getRange(1, 1).getValue();
+  if (firstCell !== 'ID') {
+    sheet.getRange(1, 1, 1, 3).setValues([HEADERS]);
+  }
   return sheet;
-}
-
-function defaultData() {
-  return {
-    expenses: [],
-    banks: [
-      { id: 'b1', name: 'BDO' },
-      { id: 'b2', name: 'BPI' },
-      { id: 'b3', name: 'GCash' }
-    ],
-    finEntries: { allan: [], hazel: [] },
-    nextId: 1,
-    nextFinId: 1,
-    deletedIds: []
-  };
 }
 
 function jsonResponse(obj) {
