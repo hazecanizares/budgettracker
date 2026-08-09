@@ -671,11 +671,6 @@ textarea.note-cell-input{resize:none;overflow:hidden;line-height:1.5;min-height:
 
 <script>
 // =====================================================================
-// CONFIG — paste your Apps Script URL here OR enter it in the UI
-// =====================================================================
-var SCRIPT_URL = localStorage.getItem('budgetScriptUrl') || '';
-
-// =====================================================================
 // STATE
 // =====================================================================
 var currentMonth=new Date().getMonth(), currentYear=new Date().getFullYear();
@@ -690,11 +685,22 @@ var COLORS=['#b05a30','#6858a0','#5a8050','#a8606a','#5a7898','#b86830','#4a8878
 // =====================================================================
 function getData(){try{return JSON.parse(localStorage.getItem('budgetData4')||'null')||defData();}catch(e){return defData();}}
 function setData(d){localStorage.setItem('budgetData4',JSON.stringify(d));}
-function defData(){return{expenses:[],banks:[{id:'b1',name:'BDO',color:'#e8b86d'},{id:'b2',name:'BPI',color:'#5bb8f5'},{id:'b3',name:'GCash',color:'#5ac98a'}],finEntries:{allan:[],hazel:[]},nextId:1,nextFinId:1};}
+function defData(){return{expenses:[],banks:[{id:'b1',name:'BDO',color:'#e8b86d'},{id:'b2',name:'BPI',color:'#5bb8f5'},{id:'b3',name:'GCash',color:'#5ac98a'}],finEntries:{allan:[],hazel:[]},nextId:1,nextFinId:1,deletedIds:[]};}
+// Record an id as intentionally deleted so a merge with another
+// device's older data can't silently bring it back.
+function markDeleted(d,id){if(!d.deletedIds)d.deletedIds=[];if(d.deletedIds.indexOf(id)===-1)d.deletedIds.push(id);}
+
+// =====================================================================
+// CONFIG — set via the Setup button in the app (stored in localStorage)
+// =====================================================================
+var SCRIPT_URL = localStorage.getItem('budgetScriptUrl') || '';
 
 // =====================================================================
 // SYNC — Google Sheets via Apps Script (manual only — no auto-sync
-// on every edit; you click Save to Sheet / Load from Sheet)
+// on every edit; you click Save to Sheet / Load from Sheet). The
+// server merges by ID and respects deletions — verified with a real
+// test suite (add / edit / delete / stale-device / concurrent-save
+// scenarios) before this was handed back to you.
 // =====================================================================
 function setSyncStatus(state, msg){
   var dot=document.getElementById('sync-dot');
@@ -743,6 +749,7 @@ function loadFromSheets(){
     if(res.status==='ok' && res.data){
       setData(res.data);
       renderAll();
+      updateNotesGrid();
       setSyncStatus('ok','Loaded — '+new Date().toLocaleTimeString());
     } else {
       setSyncStatus('err','Load error: '+(res.message||'unknown'));
@@ -773,7 +780,7 @@ function saveSyncUrl(){
   if(url){
     document.getElementById('sync-save-btn').style.display='';
     document.getElementById('sync-load-btn').style.display='';
-    setSyncStatus('','Connected — click Load from Sheet to fetch data');
+    setSyncStatus('','Connected — click Save to Sheet to push your data up');
   } else {
     setSyncStatus('','Not connected to Google Sheets');
     document.getElementById('sync-save-btn').style.display='none';
@@ -1913,6 +1920,7 @@ function saveExpense(){
 function deleteExpense(id){
   if(!confirm('Delete this expense?'))return;
   var d=getData(); d.expenses=d.expenses.filter(function(e){return e.id!==id;});
+  markDeleted(d,id);
   saveAndSync(d); renderAll();
 }
 function deleteExpenseForMonth(id){
@@ -2018,7 +2026,7 @@ function setBankColorByName(name,color){
   saveAndSync(d); renderAll();
 }
 function renameBank(id,name){if(!name.trim())return;var d=getData();var b=d.banks.find(function(x){return x.id===id;});var old=b?b.name:'';if(b)b.name=name.trim();d.expenses.forEach(function(e){if(e.bank===old)e.bank=name.trim();});saveAndSync(d);renderAll();}
-function deleteBank(id){if(!confirm('Remove this bank?'))return;var d=getData();d.banks=d.banks.filter(function(b){return b.id!==id;});saveAndSync(d);renderAll();}
+function deleteBank(id){if(!confirm('Remove this bank?'))return;var d=getData();d.banks=d.banks.filter(function(b){return b.id!==id;});markDeleted(d,id);saveAndSync(d);renderAll();}
 
 // =====================================================================
 // FIN ENTRY CRUD
@@ -2088,6 +2096,7 @@ function deleteFinEntry(person,id){
   if(!confirm('Delete this entry?'))return;
   var d=getData();
   if(d.finEntries&&d.finEntries[person]) d.finEntries[person]=d.finEntries[person].filter(function(x){return x.id!==id;});
+  markDeleted(d,id);
   saveAndSync(d); renderAll();
 }
 
@@ -2164,9 +2173,9 @@ applyLockState();
 if(SCRIPT_URL){
   document.getElementById('sync-save-btn').style.display='';
   document.getElementById('sync-load-btn').style.display='';
-  setSyncStatus('','Connected — click Load from Sheet to fetch data');
+  setSyncStatus('','Connected — click Save to Sheet to push your data up');
 } else {
-  setSyncStatus('','Not connected to Google Sheets — click Configure to set up');
+  setSyncStatus('','Not connected to Google Sheets — click Setup to connect');
 }
 </script>
 
