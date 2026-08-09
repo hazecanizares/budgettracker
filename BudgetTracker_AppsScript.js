@@ -139,7 +139,21 @@ function handleSave(incoming) {
     sheet.getRange(1, 2).setValue('Last saved: ' + new Date().toLocaleString());
     writeReadableExpenses(sheet, merged);
 
-    return jsonResponse({ status: 'ok', message: 'Saved successfully', data: merged });
+    // Force the write to commit, then read it back within this same
+    // execution to PROVE it actually landed — independent of whatever
+    // any browser tab is showing.
+    SpreadsheetApp.flush();
+    var confirmRaw = sheet.getRange(1, 1).getValue();
+    var confirmLength = confirmRaw ? String(confirmRaw).length : 0;
+
+    return jsonResponse({
+      status: 'ok',
+      message: 'Saved successfully',
+      data: merged,
+      debugConfirmedLength: confirmLength,
+      debugSheetUrl: SpreadsheetApp.openById(SHEET_ID).getUrl(),
+      debugTabName: sheet.getName()
+    });
   } catch (err) {
     return jsonResponse({ status: 'error', message: 'Save failed: ' + err.toString() });
   }
@@ -219,9 +233,9 @@ function defaultData() {
   return {
     expenses: [],
     banks: [
-      { id: 'b1', name: 'MB Platinum' },
+      { id: 'b1', name: 'BDO' },
       { id: 'b2', name: 'BPI' },
-      { id: 'b3', name: 'MB MFREE' }
+      { id: 'b3', name: 'GCash' }
     ],
     finEntries: { allan: [], hazel: [] },
     nextId: 1,
