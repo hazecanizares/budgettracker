@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Budget Tracker — Backup Tool</title>
+<style>
+body{font-family:-apple-system,'DM Sans',sans-serif;background:#f7f3ee;color:#2e2820;padding:20px;max-width:600px;margin:0 auto;line-height:1.5}
+h1{color:#b05a30;font-size:20px}
+.card{background:#ede7df;border:1px solid #c8bfb0;border-radius:12px;padding:16px;margin-bottom:16px}
+.warn{background:#fbeae6;border-color:#a04838;color:#7a2c1c}
+.ok{background:#eaf1e7;border-color:#5a8050;color:#2c4a24}
+button{padding:12px 18px;border-radius:8px;border:none;background:#b05a30;color:white;font-size:14px;font-weight:600;cursor:pointer;width:100%;margin-top:8px}
+button:disabled{background:#c8bfb0;cursor:not-allowed}
+button.secondary{background:#6e6055}
+textarea{width:100%;min-height:120px;font-family:monospace;font-size:11px;padding:8px;border-radius:8px;border:1px solid #c8bfb0;box-sizing:border-box}
+input[type=file]{width:100%;margin-top:8px}
+.stat{font-size:13px;color:#6e6055;margin-top:6px}
+code{background:#e3dbd0;padding:1px 5px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+
+<h1>Budget Tracker — Backup Tool</h1>
+<p style="color:#6e6055;font-size:13px">This page reads the same browser storage as your budget tracker app (as long as it's uploaded to the same site). It does not modify your app or its data unless you click Restore.</p>
+
+<div class="card" id="status-card">
+  <div id="status">Checking for local data...</div>
+</div>
+
+<div class="card">
+  <strong>1. Download a backup</strong>
+  <div class="stat">Saves everything currently in this browser to a file on your device.</div>
+  <button id="download-btn" onclick="downloadBackup()" disabled>Download Backup (.json)</button>
+</div>
+
+<div class="card">
+  <strong>2. Restore from a backup</strong>
+  <div class="stat">Only use this once your new app is set up and ready. This will overwrite whatever is currently in this browser's local data.</div>
+  <input type="file" id="restore-file" accept="application/json">
+  <button class="secondary" onclick="restoreBackup()">Restore This File</button>
+</div>
+
+<div class="card">
+  <strong>View raw data</strong>
+  <div class="stat">For copy-pasting manually if you ever need to.</div>
+  <textarea id="raw-view" readonly></textarea>
+</div>
+
+<script>
+function getRaw(){ return localStorage.getItem('budgetData4'); }
+
+function refreshStatus(){
+  var raw = getRaw();
+  var statusEl = document.getElementById('status');
+  var card = document.getElementById('status-card');
+  var dlBtn = document.getElementById('download-btn');
+  var rawView = document.getElementById('raw-view');
+
+  if(!raw){
+    statusEl.innerHTML = '<strong>No local data found on this page.</strong><br>This means either there\'s nothing saved here, or this backup tool isn\'t on the same site as your app yet.';
+    card.className = 'card warn';
+    dlBtn.disabled = true;
+    rawView.value = '';
+    return;
+  }
+
+  try {
+    var data = JSON.parse(raw);
+    var expCount = (data.expenses||[]).length;
+    var bankCount = (data.banks||[]).length;
+    var allanCount = (data.finEntries && data.finEntries.allan || []).length;
+    var hazelCount = (data.finEntries && data.finEntries.hazel || []).length;
+    statusEl.innerHTML = '<strong>Found local data:</strong><br>' +
+      expCount + ' expenses, ' + bankCount + ' banks, ' +
+      allanCount + ' Allan entries, ' + hazelCount + ' Hazel entries.';
+    card.className = 'card ok';
+    dlBtn.disabled = false;
+    rawView.value = JSON.stringify(data, null, 2);
+  } catch(e) {
+    statusEl.innerHTML = '<strong>Local data found but could not be read (invalid format).</strong> Raw content is shown below — you can copy it manually as a fallback.';
+    card.className = 'card warn';
+    dlBtn.disabled = false;
+    rawView.value = raw;
+  }
+}
+
+function downloadBackup(){
+  var raw = getRaw();
+  if(!raw) return;
+  var blob = new Blob([raw], {type: 'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  var stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  a.href = url;
+  a.download = 'budget-backup-' + stamp + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function restoreBackup(){
+  var fileInput = document.getElementById('restore-file');
+  if(!fileInput.files.length){ alert('Choose a backup file first.'); return; }
+  if(!confirm('This will overwrite whatever local data is currently in this browser. Continue?')) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      var parsed = JSON.parse(e.target.result); // validate it's real JSON first
+      localStorage.setItem('budgetData4', JSON.stringify(parsed));
+      alert('Restored. Open your budget tracker app now — it should show this data.');
+      refreshStatus();
+    } catch(err) {
+      alert('That file is not valid — nothing was changed.');
+    }
+  };
+  reader.readAsText(fileInput.files[0]);
+}
+
+refreshStatus();
+</script>
+</body>
+</html>
