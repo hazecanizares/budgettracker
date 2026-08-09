@@ -187,7 +187,7 @@ body.locked .paid-btn,
 body.locked .note-add-col-btn,
 body.locked .note-action-td,
 body.locked .note-table-header .btn,
-body.locked #sync-now-btn,
+body.locked #sync-save-btn,
 body.locked .bank-name-input,
 body.locked [onclick="addNoteTable()"],
 body.locked .table-toolbar .btn-primary{display:none !important}
@@ -433,7 +433,8 @@ textarea.note-cell-input{resize:none;overflow:hidden;line-height:1.5;min-height:
   <div class="sync-dot" id="sync-dot"></div>
   <span class="sync-label" id="sync-label">Not connected to Google Sheets</span>
   <button class="sync-url-btn" onclick="openSyncSetup()">&#9881; Setup</button>
-  <button class="sync-url-btn" id="sync-now-btn" onclick="syncNow()" style="display:none">&#8635; Sync Now</button>
+  <button class="sync-url-btn" id="sync-save-btn" onclick="syncNow()" style="display:none">&#8593; Save to Sheet</button>
+  <button class="sync-url-btn" id="sync-load-btn" onclick="loadFromSheets()" style="display:none">&#8595; Load from Sheet</button>
 </div>
 
 <div class="calendar-bar">
@@ -692,22 +693,25 @@ function setData(d){localStorage.setItem('budgetData4',JSON.stringify(d));}
 function defData(){return{expenses:[],banks:[{id:'b1',name:'BDO',color:'#e8b86d'},{id:'b2',name:'BPI',color:'#5bb8f5'},{id:'b3',name:'GCash',color:'#5ac98a'}],finEntries:{allan:[],hazel:[]},nextId:1,nextFinId:1};}
 
 // =====================================================================
-// SYNC — Google Sheets via Apps Script
+// SYNC — Google Sheets via Apps Script (manual only — no auto-sync
+// on every edit; you click Save to Sheet / Load from Sheet)
 // =====================================================================
 function setSyncStatus(state, msg){
   var dot=document.getElementById('sync-dot');
   var lbl=document.getElementById('sync-label');
-  var btn=document.getElementById('sync-now-btn');
+  var saveBtn=document.getElementById('sync-save-btn');
+  var loadBtn=document.getElementById('sync-load-btn');
   dot.className='sync-dot '+(state==='ok'?'ok':state==='err'?'err':state==='busy'?'busy':'');
   lbl.textContent=msg;
-  btn.style.display=SCRIPT_URL?'':'none';
+  saveBtn.style.display=SCRIPT_URL?'':'none';
+  loadBtn.style.display=SCRIPT_URL?'':'none';
 }
 
 function syncNow(){
   if(!SCRIPT_URL){openSyncSetup();return;}
   if(isSyncing)return;
   isSyncing=true;
-  setSyncStatus('busy','Syncing with Google Sheets...');
+  setSyncStatus('busy','Saving to Google Sheets...');
   var d=getData();
   fetch(SCRIPT_URL, {
     method:'POST',
@@ -718,14 +722,14 @@ function syncNow(){
   .then(function(res){
     if(res.status==='ok'){
       if(res.data) setData(res.data); // adopt server-merged result so this device stays in sync
-      setSyncStatus('ok','Synced — '+new Date().toLocaleTimeString());
+      setSyncStatus('ok','Saved — '+new Date().toLocaleTimeString());
     } else {
-      setSyncStatus('err','Sync error: '+(res.message||'unknown'));
+      setSyncStatus('err','Save error: '+(res.message||'unknown'));
     }
     isSyncing=false;
   })
   .catch(function(err){
-    setSyncStatus('err','Sync failed — check URL or internet connection');
+    setSyncStatus('err','Save failed — check URL or internet connection');
     isSyncing=false;
   });
 }
@@ -749,10 +753,10 @@ function loadFromSheets(){
   });
 }
 
-// Auto-sync on every data write
+// Local save only — no automatic sync. Use the Save to Sheet /
+// Load from Sheet buttons to move data to/from Google Sheets.
 function saveAndSync(d){
   setData(d);
-  if(SCRIPT_URL) syncNow();
 }
 
 // Setup modal
@@ -767,11 +771,13 @@ function saveSyncUrl(){
   localStorage.setItem('budgetScriptUrl',url);
   closeSyncSetup();
   if(url){
-    document.getElementById('sync-now-btn').style.display='';
-    loadFromSheets();
+    document.getElementById('sync-save-btn').style.display='';
+    document.getElementById('sync-load-btn').style.display='';
+    setSyncStatus('','Connected — click Load from Sheet to fetch data');
   } else {
     setSyncStatus('','Not connected to Google Sheets');
-    document.getElementById('sync-now-btn').style.display='none';
+    document.getElementById('sync-save-btn').style.display='none';
+    document.getElementById('sync-load-btn').style.display='none';
   }
 }
 
@@ -2156,8 +2162,9 @@ updateNotesGrid();
 if(localStorage.getItem('budgetLocked')===null) localStorage.setItem('budgetLocked','0');
 applyLockState();
 if(SCRIPT_URL){
-  document.getElementById('sync-now-btn').style.display='';
-  loadFromSheets();
+  document.getElementById('sync-save-btn').style.display='';
+  document.getElementById('sync-load-btn').style.display='';
+  setSyncStatus('','Connected — click Load from Sheet to fetch data');
 } else {
   setSyncStatus('','Not connected to Google Sheets — click Configure to set up');
 }
