@@ -728,7 +728,11 @@ function syncNow(){
   .then(function(res){
     if(res.status==='ok'){
       if(res.data) setData(res.data); // adopt server-merged result so this device stays in sync
-      setSyncStatus('ok','Saved — '+new Date().toLocaleTimeString());
+      var confirmMsg = res.debugConfirmedLength!==undefined ? ' — '+res.debugConfirmedLength+' chars confirmed on server' : '';
+      setSyncStatus('ok','Saved — '+new Date().toLocaleTimeString()+confirmMsg);
+      if(res.debugSheetUrl){
+        alert('This save just wrote '+res.debugConfirmedLength+' characters to:\n\n'+res.debugSheetUrl+'\n\nTab name: '+res.debugTabName+'\n\nOpen that exact link and check if it matches what you\'ve been looking at.');
+      }
     } else {
       setSyncStatus('err','Save error: '+(res.message||'unknown'));
     }
