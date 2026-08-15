@@ -903,7 +903,7 @@ function buildCatBarList(segs,title,bigFont,noPct,colorPicker){
       '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'+
         dotCell+
         '<span style="font-size:'+fs+';color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escH(seg.label)+'</span>'+
-        '<span style="font-size:'+fs+';font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;display:inline-flex;min-width:110px;justify-content:space-between"><span>&#8369;</span><span>'+fmt(seg.value)+'</span></span>'+
+        '<span style="font-size:'+fs+';font-weight:600;color:'+(seg.amtColor||'var(--text)')+';font-variant-numeric:tabular-nums;white-space:nowrap;display:inline-flex;min-width:110px;justify-content:space-between"><span>&#8369;</span><span>'+fmt(seg.value)+'</span></span>'+
         (noPct?'':'<span style="font-size:'+fs+';color:var(--text2);white-space:nowrap;min-width:40px;text-align:right;margin-left:6px">'+pct+'%</span>')+
       '</div>'+
       '<div style="background:var(--surface2);border-radius:4px;overflow:hidden;height:6px">'+
@@ -1183,9 +1183,10 @@ function renderPersonTab(person){
         else bankUnpaidAmt+=amt;
       });
       grandPaid+=bankPaidAmt; grandUnpaid+=bankUnpaidAmt;
+      var amtColor=allPaid?'var(--green)':(bankPaidAmt>0?'var(--orange)':'var(--text)');
       return '<tr>'+
         '<td style="padding:7px 10px 7px 0;font-size:13px;font-weight:600;color:var(--text);border-bottom:1px solid var(--border)">'+escH(k)+'</td>'+
-        '<td style="padding:7px 10px;font-size:13px;font-weight:600;color:var(--text);border-bottom:1px solid var(--border);white-space:nowrap"><span style="display:inline-flex;min-width:110px;justify-content:space-between;font-variant-numeric:tabular-nums"><span>&#8369;</span><span>'+fmt(bankMap[k])+'</span></span></td>'+
+        '<td style="padding:7px 10px;font-size:13px;font-weight:600;color:'+amtColor+';border-bottom:1px solid var(--border);white-space:nowrap"><span style="display:inline-flex;min-width:110px;justify-content:space-between;font-variant-numeric:tabular-nums"><span>&#8369;</span><span>'+fmt(bankMap[k])+'</span></span></td>'+
         '<td style="padding:7px 0 7px 10px;text-align:right;border-bottom:1px solid var(--border)"><button class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 10px;width:84px;justify-content:center;'+btnStyle+'" onclick="markBankPaid(\''+escH(ids)+'\',\''+pLower+'\','+allPaid+')">'+btnLabel+'</button></td>'+
       '</tr>';
     }).join('');
@@ -1298,6 +1299,14 @@ function buildBankBarCard(){
     }
   });
   segs.sort(function(a,b){return b.value-a.value;});
+  segs.forEach(function(s){
+    var exps=bankExpMap[s.label]||[];
+    if(exps.length){
+      var allPaid=exps.every(function(e){return getPaid(e,'paid');});
+      var anyPaid=exps.some(function(e){return getPaid(e,'paid');});
+      s.amtColor=allPaid?'var(--green)':(anyPaid?'var(--orange)':null);
+    }
+  });
 
   var footer=
     '<div class="bank-footer" style="margin-top:14px;border-top:2px solid var(--border);padding-top:12px">'+
