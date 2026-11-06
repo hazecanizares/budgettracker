@@ -683,7 +683,22 @@ var COLORS=['#b05a30','#6858a0','#5a8050','#a8606a','#5a7898','#b86830','#4a8878
 // =====================================================================
 // LOCAL DATA (cache — also used when offline)
 // =====================================================================
-function getData(){try{return JSON.parse(localStorage.getItem('budgetData4')||'null')||defData();}catch(e){return defData();}}
+function getData(){var d;try{d=JSON.parse(localStorage.getItem('budgetData4')||'null')||defData();}catch(e){d=defData();}return dedupeBanks(d);}
+// Merge banks that share the same name (e.g. created on two devices and
+// merged by sync). Keeps the first one; extra copies are marked deleted
+// so the next Save to Sheet removes them from the sheet too.
+function dedupeBanks(d){
+  if(!d||!Array.isArray(d.banks))return d;
+  var seen={},kept=[];
+  d.banks.forEach(function(b){
+    var key=String(b&&b.name||'').trim().toLowerCase();
+    if(key&&seen[key]){markDeleted(d,b.id);return;}
+    if(key)seen[key]=1;
+    kept.push(b);
+  });
+  if(kept.length!==d.banks.length){d.banks=kept;setData(d);}
+  return d;
+}
 function setData(d){localStorage.setItem('budgetData4',JSON.stringify(d));}
 function defData(){return{expenses:[],banks:[{id:'b1',name:'BDO',color:'#e8b86d'},{id:'b2',name:'BPI',color:'#5bb8f5'},{id:'b3',name:'GCash',color:'#5ac98a'}],finEntries:{allan:[],hazel:[]},nextId:1,nextFinId:1,deletedIds:[]};}
 // Record an id as intentionally deleted so a merge with another
@@ -2021,7 +2036,7 @@ function togglePaidPerson(id,person){
 // =====================================================================
 // BANK CRUD
 // =====================================================================
-function addBank(){var name=prompt('Enter bank name:');if(!name||!name.trim())return;var d=getData();var defColors=['#b05a30','#5a7898','#5a8050','#6858a0','#a8606a','#b86830','#4a8878'];var col=defColors[d.banks.length%defColors.length];d.banks.push({id:'b'+Date.now(),name:name.trim(),color:col});saveAndSync(d);renderBanks();}
+function addBank(){var name=prompt('Enter bank name:');if(!name||!name.trim())return;var d=getData();if(d.banks.some(function(b){return String(b.name).trim().toLowerCase()===name.trim().toLowerCase();})){alert('A bank named "'+name.trim()+'" already exists.');return;}var defColors=['#b05a30','#5a7898','#5a8050','#6858a0','#a8606a','#b86830','#4a8878'];var col=defColors[d.banks.length%defColors.length];d.banks.push({id:'b'+Date.now(),name:name.trim(),color:col});saveAndSync(d);renderBanks();}
 function setBankColor(id,color){
   var d=getData();
   var b=d.banks.find(function(x){return x.id===id;});
